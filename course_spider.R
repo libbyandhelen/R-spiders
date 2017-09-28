@@ -16,7 +16,7 @@ xpaths = paste("//a[@name='DERIVED_SSS_BCC_SSR_ALPHANUM_", LETTERS, "']/attribut
 codes = c()
 #courses = c()
 course_info = list()
-for(i in 7:length(xpaths)){
+for(i in 1:length(xpaths)){
   alphanum = getNodeSet(webpage, path=xpaths[i])
   alphanum = substr(as(alphanum, "character"), 45, 74)
   
@@ -68,12 +68,12 @@ for(i in 7:length(xpaths)){
     requirement = NULL
     if(length(course_detail_nodes)%%2 == 1){
       for(j in 1:(length(course_detail_nodes)%/%2)){
-        components = c(components, component = paste(as(course_detail_nodes[[2*j]], "character"), as(course_detail_nodes[[2*j+1]], "character")))
+        components[j] = list(component = paste(as(course_detail_nodes[[2*j]], "character"), as(course_detail_nodes[[2*j+1]], "character")))
       }
     }
     else{
       for(j in 1:(length(course_detail_nodes)%/%2-1)){
-        components = c(components, component = paste(as(course_detail_nodes[[2*j]], "character"), as(course_detail_nodes[[2*j+1]], "character")))
+        components[j] = list(component = paste(as(course_detail_nodes[[2*j]], "character"), as(course_detail_nodes[[2*j+1]], "character")))
       }
       requirement = as(course_detail_nodes[[length(course_detail_nodes)]], "character")
     }
@@ -154,7 +154,7 @@ for(i in 7:length(xpaths)){
         class_content_nodes = getNodeSet(class_detail_page, path="//table[@class='PSLEVEL1GRIDWBO']//span/text()")
         section_list = list()
         for(k in 1:(length(class_content_nodes)%/%4)){
-          section_list = c(section_list, list(
+          section_list[k] = list(section = list(
             days = as(class_content_nodes[[4*(k-1)+1]], "character"),
             room = as(class_content_nodes[[4*(k-1)+2]], "character"),
             instructor = as(class_content_nodes[[4*(k-1)+3]], "character"),
@@ -176,7 +176,7 @@ for(i in 7:length(xpaths)){
           available_seat = as(class_content_nodes[[5]], "character")
         }
         
-        class_list = c(class_list, list(
+        class_list[j] = list(class_list = list(
           class_code = as(class_codes[[j]], "character"),
           status = status,
           class_number = class_number,
@@ -191,8 +191,41 @@ for(i in 7:length(xpaths)){
       }
     }
     
-    course_info = c(
-      course_info,
+    course_outcome_nodes = getNodeSet(course_detail_page, path="//a[@name='CU_DERIVED_CUR_CU_CRSE_OUT_BTN']/attribute::href")
+    course_outcome_nodes = as(course_outcome_nodes, "character")
+    course_outcome_path = substr(course_outcome_nodes, 45, nchar(course_outcome_nodes)-3)
+    
+    course_outcome_path = paste(url, "?ICAction=", course_outcome_path, sep="")
+    course_outcome_page = htmlTreeParse(POST(course_outcome_path), useInternalNodes = TRUE)
+    
+    course_outcome_content = getNodeSet(course_outcome_page, path="//table[@class='PSGROUPBOX']//div[text()!='']")
+    if(length(course_outcome_content) == 6){
+      learning_outcome = xmlValue(course_outcome_content[[2]])
+      syllabus = xmlValue(course_outcome_content[[3]])
+      feedback = xmlValue(course_outcome_content[[4]])
+      required_reading = xmlValue(course_outcome_content[[5]])
+      recommended_reading = xmlValue(course_outcome_content[[6]])
+    }
+    else{
+      learning_outcome = xmlValue(course_outcome_content[[1]])
+      syllabus = xmlValue(course_outcome_content[[2]])
+      feedback = xmlValue(course_outcome_content[[3]])
+      required_reading = xmlValue(course_outcome_content[[4]])
+      recommended_reading = xmlValue(course_outcome_content[[5]])
+    }
+    
+    course_outcome_content = getNodeSet(course_outcome_page, path="//span[@class='PSEDITBOX_DISPONLY']/text()")
+    assessment = list()
+    for(j in 1:(length(course_outcome_content)%/%2)){
+      type = as(course_outcome_content[[2*j-1]], "character")
+      percent = as(course_outcome_content[[2*j]], "character")
+      assessment[j] = list(assessment = list(
+        type = type,
+        percent = percent
+      ))
+    }
+    
+    course_info[i] = (list(
       course = list(
         course_code = course_code,
         course_title = course_title,
@@ -204,17 +237,20 @@ for(i in 7:length(xpaths)){
         components = components,
         requirement = requirement,
         description = description,
+        learning_outcome = learning_outcome,
+        syllabus = syllabus,
+        assessment = assessment,
+        feedback = feedback,
+        required_reading = required_reading,
+        recommended_reading = recommended_reading,
         class_list = class_list
       )
-    )
-    POST(paste(url, "?ICAction=DERIVED_SAA_CRS_RETURN_PB$160$", sep=''))
+    ))
+    POST(paste(url, "?ICAction=DERIVED_SAA_CRS_RETURN_PB", sep=''))
     print(paste(course_code, course_title))
   }
   
 }
 
-b = toJSON(course_info, pretty)
-cd = "a"
-a = list(cd = "hello", cd = "libby3")
-b = toJSON(list(o = "haha", d = a), pretty = TRUE)
+b = toJSON(course_info, pretty = TRUE)
 write(b, "/Users/yingbozhang/Desktop/rproj/test.json")
