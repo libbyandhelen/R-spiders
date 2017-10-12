@@ -1,20 +1,33 @@
-install.packages("RCurl")
-install.packages("XML")
-install.packages("httr")
-install.packages("rjson")
-install.packages("RJSONIO")
-install.packages('parallel')
+# install.packages("RCurl",repos = "http://cran.us.r-project.org")
+# install.packages("XML", repos = "http://cran.us.r-project.org")
+# install.packages("httr",repos = "http://cran.us.r-project.org")
+# install.packages("rjson",repos = "http://cran.us.r-project.org")
+# install.packages("RJSONIO",repos = "http://cran.us.r-project.org")
+# install.packages('parallel',repos = "http://cran.us.r-project.org")
 library(RCurl)
 library(XML)
 library(httr)
 library(RJSONIO)
 library(parallel)
 
-if (file.exists("/Users/yingbozhang/Desktop/myproj/rproj/debug.txt")){
-  file.remove("/Users/yingbozhang/Desktop/myproj/rproj/debug.txt")
+file_path = "/Users/yingbozhang/Desktop/myproj/rproj/"
+
+if (file.exists(paste0(file_path, "debug.txt"))){
+  file.remove(paste0(file_path, "debug.txt"))
+}
+if (file.exists(paste0(file_path, "course_info.json"))){
+  file.copy(paste0(file_path, "course_info.json"), paste0(file_path, "course_info_bak.json"))
+  file.remove(paste0(file_path, "course_info.json"))
+}
+for(i in 1:8){
+  if (file.exists(paste0("/Users/yingbozhang/Desktop/myproj/rproj/course_info",i,".json"))){
+    file.copy(paste0(file_path, "course_info",i,".json"), paste0(file_path, "course_info",i,"_bak.json"))
+    file.remove(paste0(file_path, "course_info",i,".json"))
+  }
 }
 
-main = function(job_list){
+
+main = function(job_list, file_path){
   tryCatch(
     {
       url = "https://cusis.cuhk.edu.hk/psc/public/EMPLOYEE/HRMS/c/COMMUNITY_ACCESS.SSS_BROWSE_CATLG.GBL"
@@ -251,7 +264,7 @@ main = function(job_list){
       }
       print(paste("core", job_list[1], "is finished."))
       course_info = toJSON(course_info, pretty = TRUE)
-      write(course_info, paste0("/Users/yingbozhang/Desktop/myproj/rproj/course_info", job_list[1], ".json"))
+      write(course_info, paste0(file_path, "course_info", job_list[1], ".json"))
     },
     error=function(e){
       print("error occurs")
@@ -272,13 +285,13 @@ job_list=list(
 core_num = detectCores()
 cl = makeCluster(core_num, outfile = "/Users/yingbozhang/Desktop/myproj/rproj/debug.txt")
 clusterExport(cl, list("getNodeSet", "htmlTreeParse", "POST", "GET", "xmlValue", "xmlAttrs", "toJSON"))
-parLapply(cl, job_list, fun=main)
+parLapply(cl, job_list, fun=main, file_path)
 stopCluster(cl)
 
 while(TRUE){
   again = c()
   for(i in 1:core_num){
-    if (file.exists(paste0("/Users/yingbozhang/Desktop/myproj/rproj/course_info", i, ".json")) == FALSE){
+    if (file.exists(paste0(file_path, "course_info", i, ".json")) == FALSE){
       again = c(again, i)
     }
   }
@@ -290,15 +303,15 @@ while(TRUE){
   for(i in 1:length(again)){
     job_list2[[i]] = job_list[[again[i]]]
   }
-  cl = makeCluster(new_core_num, outfile = "/Users/yingbozhang/Desktop/myproj/rproj/debug.txt")
+  cl = makeCluster(new_core_num, outfile = paste0(file_path, "debug.txt"))
   clusterExport(cl, list("getNodeSet", "htmlTreeParse", "POST", "GET", "xmlValue", "xmlAttrs", "toJSON"))
-  parLapply(cl, job_list2, fun=main)
+  parLapply(cl, job_list2, fun=main, file_path)
   stopCluster(cl)
 }
 
-file.create("/Users/yingbozhang/Desktop/myproj/rproj/course_info.json")
+file.create(paste0(file_path, "course_info.json"))
 for(i in 1:8){
-  file.append("/Users/yingbozhang/Desktop/myproj/rproj/course_info.json",
-    paste0("/Users/yingbozhang/Desktop/myproj/rproj/course_info", i, ".json")
+  file.append(paste0(file_path, "course_info.json"),
+    paste0(file_path, "course_info", i, ".json")
   )
 }
